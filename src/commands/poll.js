@@ -1,15 +1,10 @@
-// * CUSTOM POLL
-
-const {
-  EmbedBuilder,
-  AttachmentBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-} = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder } = require("discord.js");
 
 const votes = {};
+const userNames = {}; // Object to store user names who voted for each option
 
 module.exports = (client) => {
+  // Pass the 'client' as an argument to the module
   client.on("interactionCreate", async (interaction) => {
     if (interaction.isCommand() && interaction.commandName === "poll") {
       // Check if the user has the allowed role or user ID
@@ -107,6 +102,9 @@ module.exports = (client) => {
         console.log("Poll Options:", options);
         console.log("Options Limit:", optionsLimit);
 
+        // Initialize userNames object for this poll
+        userNames[pollQuestion] = options.map(() => []);
+
         votes[pollQuestion] = {
           userVotes: {},
         };
@@ -129,7 +127,6 @@ module.exports = (client) => {
           });
 
         const message = await channel.send({
-          content: "@everyone: Votem todos!",
           embeds: [exampleEmbed],
         });
 
@@ -174,7 +171,8 @@ module.exports = (client) => {
             buttonInteraction.isButton() &&
             buttonInteraction.message.id === message.id
           ) {
-            const { customId, user } = buttonInteraction;
+            const { customId, user, guild } = buttonInteraction; // Destructure 'guild' here
+
             console.log(`Voto adicionado em ${customId}`);
 
             const currentVotes = votes[pollQuestion][customId] || [];
@@ -187,6 +185,15 @@ module.exports = (client) => {
 
               const userVoteIndex = userVotes.indexOf(customId);
               userVotes.splice(userVoteIndex, 1);
+
+              // Remove the user's name from the userNames object
+              const userNameIndex = userNames[pollQuestion][customId].indexOf(
+                guild.members.cache.get(user.id)?.displayName || user.username
+              );
+
+              if (userNameIndex > -1) {
+                userNames[pollQuestion][customId].splice(userNameIndex, 1);
+              }
 
               await buttonInteraction.reply({
                 content: "Voto removido.",
@@ -204,6 +211,11 @@ module.exports = (client) => {
               currentVotes.push(user.id);
               userVotes.push(customId);
 
+              // Update the userNames object with the name of the user who voted for this option
+              userNames[pollQuestion][customId].push(
+                guild.members.cache.get(user.id)?.displayName || user.username
+              );
+
               await buttonInteraction.reply({
                 content: "Voto registado.",
                 ephemeral: true,
@@ -218,6 +230,20 @@ module.exports = (client) => {
               button.setLabel(`${options[index]} (${votesCount})`);
             });
 
+            // Update the embed footer with the names of users who voted
+            exampleEmbed.setFooter({
+              text: `RUDE team\n${options
+                .map(
+                  (option, index) =>
+                    `${option} (${
+                      votes[pollQuestion][index]?.length || 0
+                    }): ${userNames[pollQuestion][index].join(", ")}`
+                )
+                .join("\n")}`,
+              setImage: "https://imgur.com/0RRPqIa.png",
+            });
+
+            // Edit the message with the updated buttons and embed
             await message.edit({
               components: rows,
               embeds: [exampleEmbed],
