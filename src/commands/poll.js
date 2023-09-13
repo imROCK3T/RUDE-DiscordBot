@@ -127,6 +127,7 @@ module.exports = (client) => {
           });
 
         const message = await channel.send({
+          content: "@everyone",
           embeds: [exampleEmbed],
         });
 
